@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Raja Mantri Chor Sipahi Daku</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #090403;
+      --card: #180b07;
+      --gold: #f59e0b;
+      --gold-bright: #fbbf24;
+      --crimson: #991b1b;
+      --border: #451a03;
+      --text: #fef3c7;
+      --muted: #a8a29e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: radial-gradient(circle at top, #260e06 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px;
+    }
+    header {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0 16px 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .brand { font-size: 1.1rem; font-weight: 800; color: var(--gold-bright); letter-spacing: 0.5px; }
+    .status-badge { font-size: 0.75rem; background: #059669; padding: 3px 8px; border-radius: 12px; font-weight: bold; }
+    .app-container {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    h2 { font-size: 1.4rem; color: var(--gold-bright); margin-bottom: 8px; }
+    p { font-size: 0.9rem; color: var(--muted); line-height: 1.4; margin-bottom: 15px; }
+    
+    input {
+      width: 100%;
+      background: #0d0503;
+      border: 1.5px solid var(--border);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 1rem;
+      text-align: center;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus { border-color: var(--gold); }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+    }
+    button:active { transform: scale(0.98); }
+    .btn-gold { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+    .btn-crimson { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; }
+    .btn-secondary { background: #27120a; border: 1px solid var(--border); color: var(--text); }
+
+    .code-pill {
+      display: inline-block;
+      background: #0d0503;
+      border: 2px dashed var(--gold);
+      color: var(--gold-bright);
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: 4px;
+      padding: 6px 18px;
+      border-radius: 8px;
+      margin: 10px 0;
+      user-select: all;
+    }
+
+    .roster { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; }
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    /* Parchi 3D Card Animation */
+    .parchi-wrapper { perspective: 1000px; margin: 20px auto; width: 220px; height: 160px; }
+    .parchi-card {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(145deg, #2b1107, #150804);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 8px 25px rgba(245, 158, 11, 0.2);
+      animation: flipIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes flipIn {
+      from { transform: rotateY(90deg); opacity: 0; }
+      to { transform: rotateY(0deg); opacity: 1; }
+    }
+    .role-badge { font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; }
+
+    /* Score Table */
+    .score-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+    .score-table th, .score-table td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+    .score-table th { background: #230d06; color: var(--gold); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">👑 SHAHI DARBAR</div>
+    <div id="connStatus" class="status-badge">ONLINE</div>
+  </header>
+
+  <div class="app-container">
+    
+    <!-- LOBBY SCREEN -->
+    <div id="screenLobby">
+      <h2>DARBAR MEIN PRAVESH</h2>
+      <p>5-Player Online Desi Multiplayer Game</p>
+      
+      <input type="text" id="playerName" placeholder="Apna Shahi Naam Likhein" value="Nick">
+
+      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <button class="btn-gold" onclick="createRoom()">👑 Naya Darbar (Host)</button>
+        <button class="btn-secondary" onclick="showJoinBox()">🗝️ Code Se Judein</button>
+      </div>
+
+      <div id="joinInputBox" style="display: none; margin-bottom: 15px;">
+        <input type="text" id="roomCodeInput" placeholder="5-Letter Room Code" style="text-transform: uppercase;">
+        <button class="btn-crimson" onclick="joinRoom()">Kamre Mein Pravesh Karein</button>
+      </div>
+
+      <div id="roomActiveBox" style="display: none;">
+        <span style="font-size: 0.8rem; color: var(--muted);">Doston ko ye code share karein:</span><br>
+        <div id="displayRoomCode" class="code-pill">-----</div>
+        
+        <div class="roster" id="rosterList"></div>
+
+        <div id="hostControls" style="display: none;">
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <button class="btn-secondary" onclick="addBot()">+ Add 1 Bot</button>
+            <button class="btn-secondary" onclick="autoFill()">Auto-Fill 5</button>
+          </div>
+          <button class="btn-crimson" onclick="startGame()">📜 Parchiyan Banten (Start)</button>
+        </div>
+        
+        <div id="clientWaitMsg" style="display: none; color: var(--gold); font-size: 0.85rem; font-weight: bold; margin-top: 10px;">
+          Raja ke aadesh ka intezar karein...
+        </div>
+      </div>
+    </div>
+
+    <!-- PARCHI REVEAL SCREEN -->
+    <div id="screenParchi" style="display: none;">
+      <h2>AAPKI SHAHI PARCHI</h2>
+      <p>Apna padd kisi ko na batayein!</p>
+
+      <div class="parchi-wrapper">
+        <div class="parchi-card">
+          <span style="font-size: 0.75rem; color: var(--muted); margin-bottom: 4px;">PADD</span>
+          <div id="myRole" class="role-badge" style="color: var(--gold-bright);">---</div>
+          <span id="rolePts" style="font-size: 0.85rem; color: #4ade80; margin-top: 6px; font-weight: bold;">---</span>
+        </div>
+      </div>
+
+      <p id="roleDesc" style="font-size: 0.85rem; margin-top: 10px;"></p>
+
+      <div id="hostCourtBtn" style="display: none;">
+        <button class="btn-gold" onclick="openDarbar()">Darbar Sajayein (Next) 🏛️</button>
+      </div>
+      <div id="clientCourtWait" style="display: none; color: var(--gold); font-size: 0.85rem;">
+        Darbar sajne ka intezar karein...
+      </div>
+    </div>
+
+    <!-- COURT SCREEN -->
+    <div id="screenCourt" style="display: none;">
+      <h2>🏛️ SHAHI DARBAR KA ADESH</h2>
+      <div style="background:#0d0503; border: 1px dashed var(--border); padding: 12px; border-radius: 8px; text-align: left; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.5;">
+        <div>👑 <strong>Raja (<span id="rajaTxt"></span>):</strong> "Mera Mantri Kaun?"</div>
+        <div style="color: #38bdf8;">🧠 <strong>Mantri (<span id="mantriTxt"></span>):</strong> "Huzoor, main hazir hoon!"</div>
+        <div style="color: #ef4444;">👑 <strong>Raja:</strong> "Sipahi (<span id="sipahiTxt"></span>), Darbar mein Daku ghus aaya hai. <strong>DAKU KO PAKDO!</strong>"</div>
+      </div>
+
+      <div id="decisionPrompt" style="color: var(--gold-bright); font-weight: bold; font-size: 0.95rem; margin-bottom: 10px;"></div>
+      <div class="roster" id="suspectsList"></div>
+    </div>
+
+    <!-- VERDICT SCREEN -->
+    <div id="screenVerdict" style="display: none;">
+      <h2 id="verdictTitle"></h2>
+      <p id="verdictDesc" style="font-weight: bold;"></p>
+
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Khiladi</th>
+            <th>Padd</th>
+            <th>Round</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="scoreRows"></tbody>
+      </table>
+
+      <div id="hostNextRoundBtn" style="display: none; margin-top: 15px;">
+        <button class="btn-gold" onclick="nextRound()">Agla Round Khelein 🔄</button>
+      </div>
+      <div id="clientNextWait" style="display: none; color: var(--gold); font-size: 0.85rem; margin-top: 15px;">
+        Host ke agle round ka intezar karein...
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const socket = io();
+    let currentRoom = null;
+    let amHost = false;
+    let myId = null;
+
+    socket.on('connect', () => {
+      myId = socket.id;
+      document.getElementById('connStatus').innerText = "ONLINE";
+      document.getElementById('connStatus').style.background = "#059669";
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('connStatus').innerText = "OFFLINE";
+      document.getElementById('connStatus').style.background = "#dc2626";
+    });
+
+    function showJoinBox() {
+      document.getElementById('joinInputBox').style.display = 'block';
+    }
+
+    function createRoom() {
+      const name = document.getElementById('playerName').value.trim() || "Host";
+      socket.emit('CREATE_ROOM', { playerName: name });
+    }
+
+    function joinRoom() {
+      const name = document.getElementById('playerName').value.trim() || "Player";
+      const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+      if (!code) return alert("Room Code dalein!");
+      socket.emit('JOIN_ROOM', { roomCode: code, playerName: name });
+    }
+
+    socket.on('ROOM_CREATED', ({ roomCode, isHost }) => {
+      currentRoom = roomCode;
+      amHost = isHost;
+      setupLobbyUI();
+    });
+
+    socket.on('JOIN_SUCCESS', ({ roomCode, isHost }) => {
+      currentRoom = roomCode;
+      amHost = isHost;
+      setupLobbyUI();
+    });
+
+    socket.on('ERROR_MSG', (msg) => alert(msg));
+
+    function setupLobbyUI() {
+      document.getElementById('playerName').style.display = 'none';
+      document.getElementById('joinInputBox').style.display = 'none';
+      document.getElementById('roomActiveBox').style.display = 'block';
+      document.getElementById('displayRoomCode').innerText = currentRoom;
+
+      if (amHost) {
+        document.getElementById('hostControls').style.display = 'block';
+        document.getElementById('clientWaitMsg').style.display = 'none';
+      } else {
+        document.getElementById('hostControls').style.display = 'none';
+        document.getElementById('clientWaitMsg').style.display = 'block';
+      }
+    }
+
+    socket.on('LOBBY_UPDATE', ({ players, hostId }) => {
+      amHost = (socket.id === hostId);
+      const list = document.getElementById('rosterList');
+      list.innerHTML = players.map(p => `
+        <div class="player-row">
+          <span>${p.name} ${p.id === hostId ? '👑' : ''}</span>
+          <span style="font-size:0.75rem; color:${p.isBot ? '#94a3b8' : '#4ade80'}; font-weight:bold;">
+            ${p.isBot ? 'BOT' : 'PLAYER'}
+          </span>
+        </div>
+      `).join('');
+    });
+
+    function addBot() { socket.emit('ADD_BOT', { roomCode: currentRoom }); }
+    function autoFill() { socket.emit('AUTO_FILL_BOTS', { roomCode: currentRoom }); }
+    function startGame() { socket.emit('START_ROUND', { roomCode: currentRoom }); }
+
+    // SECURE PRIVATE ROLE RECEIPT
+    socket.on('PRIVATE_ROLE', ({ role, round }) => {
+      document.getElementById('screenLobby').style.display = 'none';
+      document.getElementById('screenCourt').style.display = 'none';
+      document.getElementById('screenVerdict').style.display = 'none';
+      document.getElementById('screenParchi').style.display = 'block';
+
+      document.getElementById('myRole').innerText = role.toUpperCase();
+      let pts = "0 Points", desc = "";
+      if (role === 'Raja') { pts = "1000 Points"; desc = "Aap Raja hain! Mantri ko bulaayein."; }
+      else if (role === 'Mantri') { pts = "800 Points"; desc = "Aap Mantri hain! Hazir hon."; }
+      else if (role === 'Sipahi') { pts = "500 Points"; desc = "Aap Sipahi hain! Daku ko pakadein."; }
+      else if (role === 'Daku') { pts = "800 if escapes / 0 if caught"; desc = "Aap Daku hain! Chup rahein."; }
+      else { pts = "300 Points"; desc = "Aap Chor hain! Aam darbaari bane rahein."; }
+
+      document.getElementById('rolePts').innerText = pts;
+      document.getElementById('roleDesc').innerText = desc;
+
+      if (amHost) {
+        document.getElementById('hostCourtBtn').style.display = 'block';
+        document.getElementById('clientCourtWait').style.display = 'none';
+      } else {
+        document.getElementById('hostCourtBtn').style.display = 'none';
+        document.getElementById('clientCourtWait').style.display = 'block';
+      }
+    });
+
+    function openDarbar() { socket.emit('OPEN_DARBAR', { roomCode: currentRoom }); }
+
+    socket.on('COURT_OPENED', ({ raja, mantri, sipahi, suspects }) => {
+      document.getElementById('screenParchi').style.display = 'none';
+      document.getElementById('screenCourt').style.display = 'block';
+
+      document.getElementById('rajaTxt').innerText = raja.name;
+      document.getElementById('mantriTxt').innerText = mantri.name;
+      document.getElementById('sipahiTxt').innerText = sipahi.name;
+
+      const isMeSipahi = (socket.id === sipahi.id);
+      const prompt = document.getElementById('decisionPrompt');
+      const sList = document.getElementById('suspectsList');
+      sList.innerHTML = '';
+
+      if (isMeSipahi) {
+        prompt.innerText = "Aap Sipahi hain! DAKU kaun hai? Chunao karein:";
+        suspects.forEach(s => {
+          const btn = document.createElement('button');
+          btn.className = "btn-crimson";
+          btn.style.margin = "4px 0";
+          btn.innerText = `⚔️ ${s.name} Daku Hai!`;
+          btn.onclick = () => {
+            prompt.innerText = "Aapka faisla record ho gaya...";
+            sList.innerHTML = "";
+            socket.emit('SIPAHI_GUESS', { roomCode: currentRoom, suspectId: s.id });
+          };
+          sList.appendChild(btn);
+        });
+      } else {
+        prompt.innerText = `Sipahi (${sipahi.name}) Daku ko dhoondh raha hai...`;
+        suspects.forEach(s => {
+          const div = document.createElement('div');
+          div.className = "player-row";
+          div.innerText = `Sandigdh Darbaari: ${s.name}`;
+          sList.appendChild(div);
+        });
+      }
+    });
+
+    socket.on('VERDICT_ANNOUNCED', ({ isCorrect, chosenName, dakuName, roundPts, allRoles, players }) => {
+      document.getElementById('screenCourt').style.display = 'none';
+      document.getElementById('screenVerdict').style.display = 'block';
+
+      const title = document.getElementById('verdictTitle');
+      const desc = document.getElementById('verdictDesc');
+
+      if (isCorrect) {
+        title.innerText = "⚔️ DAKU RANGEY HAATHO PAKDA GAYA!";
+        title.style.color = "#4ade80";
+        desc.innerText = `Sipahi ne sahi pehchana! ${chosenName} hi Daku tha.`;
+      } else {
+        title.innerText = "🗡️ DAKU BHAAG NIKLA!";
+        title.style.color = "#ef4444";
+        desc.innerText = `Galat faisla! ${chosenName} par shaq kiya. Asli Daku (${dakuName}) points chura kar bhaag gaya!`;
+      }
+
+      const tbody = document.getElementById('scoreRows');
+      tbody.innerHTML = players.map(p => `
+        <tr>
+          <td><strong>${p.name}</strong></td>
+          <td style="color:var(--gold);">${allRoles[p.id]}</td>
+          <td style="color:#4ade80;">+${roundPts[p.id]}</td>
+          <td style="color:var(--gold-bright); font-weight:bold;">${p.score}</td>
+        </tr>
+      `).join('');
+
+      if (amHost) {
+        document.getElementById('hostNextRoundBtn').style.display = 'block';
+        document.getElementById('clientNextWait').style.display = 'none';
+      } else {
+        document.getElementById('hostNextRoundBtn').style.display = 'none';
+        document.getElementById('clientNextWait').style.display = 'block';
+      }
+    });
+
+    function nextRound() { socket.emit('NEXT_ROUND', { roomCode: currentRoom }); }
+
+    socket.on('READY_NEXT_ROUND', () => {
+      document.getElementById('screenVerdict').style.display = 'none';
+      document.getElementById('screenLobby').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
