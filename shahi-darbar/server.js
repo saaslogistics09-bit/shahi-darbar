@@ -5,8 +5,14 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS aur dual transports (WebSocket + Polling) Render proxy ke liye
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket', 'polling']
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -129,7 +135,7 @@ io.on('connection', (socket) => {
       room.roles[player.id] = chits[idx];
     });
 
-    // 1. Har individual socket ko sirf uska private role bhejte hain
+    // Har socket ko sirf uska private role bhejna
     room.players.forEach((player) => {
       if (!player.isBot) {
         io.to(player.id).emit('PRIVATE_ROLE', {
@@ -139,7 +145,6 @@ io.on('connection', (socket) => {
       }
     });
 
-    // 2. Public announcement (Roles hidden)
     io.to(roomCode).emit('ROUND_STARTED', { round: room.round });
   });
 
@@ -150,12 +155,10 @@ io.on('connection', (socket) => {
 
     room.phase = 'COURT';
 
-    // Darbar identities find karna
     const raja = room.players.find(p => room.roles[p.id] === 'Raja');
     const mantri = room.players.find(p => room.roles[p.id] === 'Mantri');
     const sipahi = room.players.find(p => room.roles[p.id] === 'Sipahi');
 
-    // Suspects: Chor aur Daku (Identity hidden, sirf naam/id public)
     const suspects = room.players
       .filter(p => room.roles[p.id] === 'Chor' || room.roles[p.id] === 'Daku')
       .map(p => ({ id: p.id, name: p.name }));
@@ -167,11 +170,10 @@ io.on('connection', (socket) => {
       suspects: fisherYatesShuffle(suspects)
     });
 
-    // Agar Sipahi BOT hai to server autonomously decision lega
+    // Agar Sipahi BOT hai
     if (sipahi.isBot) {
       setTimeout(() => {
         if (!room.roundCompleted && room.phase === 'COURT') {
-          // Medium difficulty AI: 60% chance to catch Daku
           const dakuPlayer = room.players.find(p => room.roles[p.id] === 'Daku');
           const chorPlayer = room.players.find(p => room.roles[p.id] === 'Chor');
           const pickDaku = Math.random() < 0.65;
@@ -188,7 +190,7 @@ io.on('connection', (socket) => {
     if (!room || room.phase !== 'COURT' || room.roundCompleted) return;
 
     const sipahi = room.players.find(p => room.roles[p.id] === 'Sipahi');
-    if (socket.id !== sipahi.id) return; // Sirf Sipahi choose kar sakta hai
+    if (socket.id !== sipahi.id) return;
 
     resolveVerdict(room, suspectId);
   });
@@ -200,18 +202,16 @@ io.on('connection', (socket) => {
 
     const sipahi = room.players.find(p => room.roles[p.id] === 'Sipahi');
     const daku = room.players.find(p => room.roles[p.id] === 'Daku');
-    const chor = room.players.find(p => room.roles[p.id] === 'Chor');
     const chosen = room.players.find(p => p.id === suspectId);
 
     const isCorrect = (chosen.id === daku.id);
     const roundPts = {};
 
-    // Balanced Scoring Scheme
     room.players.forEach(p => {
       const r = room.roles[p.id];
       if (r === 'Raja') roundPts[p.id] = 1000;
       else if (r === 'Mantri') roundPts[p.id] = 800;
-      else if (r === 'Chor') roundPts[p.id] = 300; // Baseline reward
+      else if (r === 'Chor') roundPts[p.id] = 300;
     });
 
     if (isCorrect) {
@@ -219,10 +219,9 @@ io.on('connection', (socket) => {
       roundPts[daku.id] = 0;
     } else {
       roundPts[sipahi.id] = 0;
-      roundPts[daku.id] = 800; // 300 base + 500 stolen
+      roundPts[daku.id] = 800;
     }
 
-    // Cumulative points
     room.players.forEach(p => {
       p.score += roundPts[p.id];
     });
@@ -255,7 +254,6 @@ io.on('connection', (socket) => {
         if (room.players.length === 0) {
           rooms.delete(code);
         } else {
-          // Host migration
           if (room.hostId === socket.id) {
             const nextHuman = room.players.find(p => !p.isBot);
             room.hostId = nextHuman ? nextHuman.id : room.players[0].id;
