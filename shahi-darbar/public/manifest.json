@@ -1,0 +1,17 @@
+{
+  "name": "Raja Mantri Chor Sipahi Daku",
+  "short_name": "Shahi Darbar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090403",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3246/3246535.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
